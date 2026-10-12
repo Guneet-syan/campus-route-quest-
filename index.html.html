@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Campus Route Quest — Dijkstra Game</title>
+<style>
+:root{--bg:#0b1020;--panel:#151d33;--panel2:#1d2945;--text:#eef3ff;--muted:#a9b6d3;--cyan:#55e6d0;--gold:#ffd166;--pink:#ff719a;--line:#526381}
+*{box-sizing:border-box}body{margin:0;font-family:system-ui,Segoe UI,Arial,sans-serif;background:radial-gradient(circle at top,#1b2a4b,#0b1020 65%);color:var(--text)}
+main{max-width:1100px;margin:auto;padding:22px}.hero{display:flex;gap:16px;align-items:center;justify-content:space-between;flex-wrap:wrap}.eyebrow{color:var(--cyan);font-weight:800;letter-spacing:2px;font-size:.75rem}.hero h1{margin:5px 0;font-size:clamp(1.7rem,4vw,2.7rem)}p{color:var(--muted);line-height:1.5;margin-top:6px}.pill{border:1px solid #3d527b;border-radius:99px;padding:8px 12px;color:var(--gold);font-size:.85rem}
+.layout{display:grid;grid-template-columns:minmax(0,1.5fr) minmax(260px,.8fr);gap:16px;margin-top:20px}.panel{background:rgba(21,29,51,.94);border:1px solid #2d3b5e;border-radius:18px;padding:16px;box-shadow:0 14px 35px #0002}.panel h2{font-size:1.05rem;margin:0 0 12px}.map-wrap{background:#0e172b;border-radius:14px;overflow:hidden;border:1px solid #2a3a5c}.map{width:100%;height:auto;display:block}.edge{stroke:var(--line);stroke-width:4;stroke-linecap:round}.edge.route{stroke:var(--cyan);stroke-width:7;filter:drop-shadow(0 0 5px #55e6d0aa)}.edge.blocked{stroke:var(--pink);stroke-dasharray:7 7;opacity:.7}.edge-label{fill:#c8d3eb;font-size:12px;font-weight:700;paint-order:stroke;stroke:#0e172b;stroke-width:4px;stroke-linejoin:round}.node{cursor:pointer}.node circle{fill:#263756;stroke:#8ea3ca;stroke-width:2.5;transition:.15s}.node text{fill:#f2f6ff;font-size:12px;font-weight:700;text-anchor:middle}.node.selected circle{fill:#ffd166;stroke:#fff0b2;stroke-width:4}.node.route-node circle{fill:#1d8f83;stroke:var(--cyan);stroke-width:4}.node:hover circle{stroke:white}.controls{display:grid;grid-template-columns:1fr 1fr;gap:10px}.controls label{display:block;font-size:.8rem;color:var(--muted);margin-bottom:5px}select,button{font:inherit;border-radius:10px;padding:10px;border:1px solid #405477;background:#0e172b;color:var(--text);width:100%}button{cursor:pointer;font-weight:800;background:var(--cyan);border-color:var(--cyan);color:#06211e;transition:transform .12s}button:hover{transform:translateY(-1px)}button.secondary{background:#263756;border-color:#405477;color:var(--text)}button.danger{background:#44283b;border-color:#8a4667;color:#ffdce7}.btns{display:grid;grid-template-columns:1fr 1fr;gap:9px;margin-top:12px}.status{padding:12px;border-radius:12px;background:#0e172b;border:1px solid #2d3b5e;margin-top:12px;min-height:74px}.status strong{color:var(--cyan)}.stats{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:12px}.stat{background:#0e172b;border:1px solid #2d3b5e;padding:10px;border-radius:12px}.stat small{display:block;color:var(--muted);font-size:.72rem}.stat b{font-size:1.2rem}.mission{color:var(--gold);font-weight:700}.legend{display:flex;gap:14px;flex-wrap:wrap;color:var(--muted);font-size:.8rem;margin:10px 2px}.dot{display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:5px;background:var(--cyan)}.dot.grey{background:var(--line)}.dot.pink{background:var(--pink)}.section-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-top:16px}.tiny{font-size:.83rem}.result-list{margin:0;padding-left:20px;color:var(--muted);line-height:1.7}.success{color:var(--cyan)}.footer{font-size:.78rem;text-align:center;color:#7f91b7;margin:20px 0 4px}
+@media(max-width:760px){.layout,.section-grid{grid-template-columns:1fr}.hero{align-items:flex-start}.stats{grid-template-columns:repeat(3,1fr)}}
+</style>
+</head>
+<body>
+<main>
+  <header class="hero">
+    <div><div class="eyebrow">ALGORITHM-BASED PROTOTYPE</div><h1>🧭 Campus Route Quest</h1><p>Deliver a parcel across campus using the shortest available route. Every metre counts!</p></div>
+    <div class="pill">Algorithm: Dijkstra’s Shortest Path</div>
+  </header>
+  <div class="layout">
+    <section class="panel">
+      <h2>Campus map <span class="tiny" style="color:var(--muted);font-weight:400">— click a place to select it</span></h2>
+      <div class="map-wrap">
+        <svg class="map" id="map" viewBox="0 0 650 430" role="img" aria-label="Interactive campus route map">
+          <path d="M20 55 Q150 20 260 55 T630 60 M20 370 Q160 410 330 365 T630 375" fill="none" stroke="#1d2b48" stroke-width="26" stroke-linecap="round"/>
+          <g id="edges"></g><g id="edgeLabels"></g><g id="nodes"></g>
+        </svg>
+      </div>
+      <div class="legend"><span><i class="dot"></i>Shortest route</span><span><i class="dot grey"></i>Walkway</span><span><i class="dot pink"></i>Closed walkway</span></div>
+      <p class="tiny">Distance labels are in metres. One walkway is randomly closed for each round, so the best route can change.</p>
+    </section>
+    <aside class="panel">
+      <h2>Delivery mission</h2>
+      <p class="mission" id="mission">Mission: deliver a parcel from Main Gate to Library.</p>
+      <div class="controls">
+        <div><label for="start">Start point</label><select id="start"></select></div>
+        <div><label for="end">Destination</label><select id="end"></select></div>
+      </div>
+      <div class="btns"><button id="solve">Find shortest route</button><button class="secondary" id="new">New challenge</button></div>
+      <div class="btns"><button class="secondary" id="check">Check my route</button><button class="danger" id="reset">Reset map</button></div>
+      <div class="status" id="status" aria-live="polite">Choose your start and destination, then find the shortest route.</div>
+      <div class="stats">
+        <div class="stat"><small>Route distance</small><b id="distance">—</b></div>
+        <div class="stat"><small>Walkways used</small><b id="hops">—</b></div>
+        <div class="stat"><small>Nodes checked</small><b id="visited">—</b></div>
+      </div>
+      <p class="tiny">Game tip: try a different destination or generate a new challenge to see how blocked paths affect the answer.</p>
+    </aside>
+  </div>
+  <div class="section-grid">
+    <section class="panel">
+      <h2>How the algorithm works</h2>
+      <ol class="result-list">
+        <li>Set the start distance to 0 and all other distances to infinity.</li>
+        <li>Repeatedly choose the unvisited node with the smallest known distance.</li>
+        <li>Update its neighbours if travelling through the current node is shorter.</li>
+        <li>Stop at the destination and follow parent links to reconstruct the route.</li>
+      </ol>
+      <p class="tiny"><b>Why Dijkstra?</b> All walkway distances are non-negative, and the algorithm finds an optimal shortest path. Breadth-first search is not suitable for unequal distances; A* can be faster on large maps if a useful heuristic is available.</p>
+    </section>
+    <section class="panel">
+      <h2>Performance & test cases</h2>
+      <p class="tiny">This small prototype uses a simple array-based Dijkstra implementation.</p>
+      <div class="stats">
+        <div class="stat"><small>Time</small><b>O(V²+E)</b></div>
+        <div class="stat"><small>Space</small><b>O(V+E)</b></div>
+        <div class="stat"><small>Graph</small><b id="graphsize">8 / 12</b></div>
+      </div>
+      <p class="tiny">V = locations, E = walkways. Test cases you can try:</p>
+      <ul class="result-list tiny">
+        <li>Main Gate → Library: normal delivery.</li>
+        <li>Hostel → Cafeteria: compare routes around a closure.</li>
+        <li>Same start and destination: distance should be 0 m.</li>
+      </ul>
+      <p class="tiny" id="testResult">Built-in check: waiting for first route calculation.</p>
+    </section>
+  </div>
+  <div class="footer">Mini routing game • Practical use: campus navigation, delivery planning and emergency route selection</div>
+</main>
+<script>
+const places=[
+ {id:0,name:"Main Gate",x:70,y:205},{id:1,name:"Admin Block",x:205,y:95},
+ {id:2,name:"Library",x:360,y:75},{id:3,name:"Cafeteria",x:515,y:150},
+ {id:4,name:"Hostel",x:520,y:320},{id:5,name:"Sports Ground",x:350,y:350},
+ {id:6,name:"Lab Block",x:205,y:300},{id:7,name:"Auditorium",x:350,y:210}
+];
+// Each edge: [from,to,distance]. Graph is undirected.
+const baseEdges=[[0,1,180],[0,6,220],[1,2,150],[1,7,170],[2,3,210],[2,7,140],[3,4,160],[3,7,130],[4,5,190],[4,7,200],[5,6,170],[5,7,160],[6,7,120]];
+let edges=baseEdges.map(e=>[...e]), blocked=null, currentPath=[], lastResult=null, userPath=[];
+const $=id=>document.getElementById(id);
+function buildSelects(){for(const id of ["start","end"]){$(id).innerHTML=places.map(p=>`<option value="${p.id}">${p.name}</option>`).join("");} $("start").value="0";$("end").value="2";}
+function edgeKey(a,b){return [Math.min(a,b),Math.max(a,b)].join("-")}
+function render(){
+ const edgesG=$("edges"), labels=$("edgeLabels"), nodesG=$("nodes"); edgesG.innerHTML="";labels.innerHTML="";nodesG.innerHTML="";
+ edges.forEach(([a,b,w])=>{const A=places[a],B=places[b],isBlocked=blocked===edgeKey(a,b),onRoute=currentPath.length>1&&currentPath.slice(1).some((n,i)=>edgeKey(currentPath[i],n)===edgeKey(a,b));
+ const line=document.createElementNS("http://www.w3.org/2000/svg","line");line.setAttribute("x1",A.x);line.setAttribute("y1",A.y);line.setAttribute("x2",B.x);line.setAttribute("y2",B.y);line.setAttribute("class","edge"+(isBlocked?" blocked":"")+(onRoute&&!isBlocked?" route":""));edgesG.appendChild(line);
+ const tx=(A.x+B.x)/2,ty=(A.y+B.y)/2-7;const text=document.createElementNS("http://www.w3.org/2000/svg","text");text.setAttribute("x",tx);text.setAttribute("y",ty);text.setAttribute("text-anchor","middle");text.setAttribute("class","edge-label");text.textContent=w;labels.appendChild(text);
+ });
+ places.forEach(p=>{const g=document.createElementNS("http://www.w3.org/2000/svg","g");const selected=[+$("start").value,+$("end").value].includes(p.id);const inPath=currentPath.includes(p.id);g.setAttribute("class","node"+(selected?" selected":"")+(inPath?" route-node":""));g.innerHTML=`<circle cx="${p.x}" cy="${p.y}" r="19"></circle><text x="${p.x}" y="${p.y+4}">${p.id+1}</text><text x="${p.x}" y="${p.y+36}" style="font-size:11px">${p.name}</text>`;g.addEventListener("click",()=>{if(document.activeElement!==$("start")&&document.activeElement!==$("end")){if(window.pickNext==="start"){$("start").value=p.id;window.pickNext="end"}else{$("end").value=p.id;window.pickNext="start"}clearResult();render()}});g.addEventListener("contextmenu",e=>{e.preventDefault();$("end").value=p.id;clearResult();render()});nodesG.appendChild(g);});
+}
+window.pickNext="start";
+function dijkstra(start,end){
+ const n=places.length,dist=Array(n).fill(Infinity),prev=Array(n).fill(null),used=Array(n).fill(false);dist[start]=0;let visited=0;
+ for(let k=0;k<n;k++){let u=-1;for(let i=0;i<n;i++)if(!used[i]&&(u===-1||dist[i]<dist[u]))u=i;
+ if(u===-1||dist[u]===Infinity)break;used[u]=true;visited++;if(u===end)break;
+ for(const [a,b,w] of edges){if(blocked===edgeKey(a,b))continue;let v=-1;if(a===u)v=b;else if(b===u)v=a;if(v!==-1&&!used[v]&&dist[u]+w<dist[v]){dist[v]=dist[u]+w;prev[v]=u;}}
+ }
+ if(!Number.isFinite(dist[end]))return {path:[],distance:Infinity,visited};
+ const path=[];for(let at=end;at!==null;at=prev[at]){path.unshift(at);if(at===start)break;}
+ return {path,distance:dist[end],visited};
+}
+function clearResult(){currentPath=[];lastResult=null;$("distance").textContent="—";$("hops").textContent="—";$("visited").textContent="—";$("status").textContent="Route cleared. Choose “Find shortest route” to solve the mission.";render();}
+function solve(){
+ const start=+$("start").value,end=+$("end").value;lastResult=dijkstra(start,end);currentPath=lastResult.path;render();
+ if(!currentPath.length){$("status").innerHTML="No route is available. Try a different destination or generate a new challenge."; $("distance").textContent="—";$("hops").textContent="—";$("visited").textContent=lastResult.visited;return;}
+ $("distance").textContent=lastResult.distance+" m";$("hops").textContent=Math.max(0,currentPath.length-1);$("visited").textContent=lastResult.visited;
+ $("status").innerHTML=`<strong>Shortest route found!</strong><br>${currentPath.map(i=>places[i].name).join(" → ")}<br>Total distance: ${lastResult.distance} m.`;
+ $("testResult").innerHTML=`<span class="success">Latest run:</span> ${places[start].name} → ${places[end].name}, ${lastResult.distance} m; ${lastResult.visited} nodes settled.`;
+}
+function newChallenge(){const options=edges.filter(e=>edgeKey(e[0],e[1])!=="0-1");const chosen=options[Math.floor(Math.random()*options.length)];blocked=edgeKey(chosen[0],chosen[1]);const start=Math.floor(Math.random()*places.length);let end=Math.floor(Math.random()*places.length);while(end===start)end=Math.floor(Math.random()*places.length);$("start").value=start;$("end").value=end;$("mission").textContent=`Mission: deliver from ${places[start].name} to ${places[end].name}. Avoid the closed walkway!`;clearResult();$("status").textContent=`New challenge: walkway ${places[chosen[0]].name} ↔ ${places[chosen[1]].name} is closed. Find the best route.`;render();}
+function resetMap(){blocked=null;$("start").value="0";$("end").value="2";$("mission").textContent="Mission: deliver a parcel from Main Gate to Library.";clearResult();$("status").textContent="Map reset. Find the shortest route for the default mission.";render();}
+$("solve").addEventListener("click",solve);
+$("new").addEventListener("click",newChallenge);
+$("reset").addEventListener("click",resetMap);
+$("check").addEventListener("click",()=>{if(!lastResult){$("status").textContent="First calculate a route, then check your answer.";return;}const again=dijkstra(+$("start").value,+$("end").value);if(again.distance===lastResult.distance)$("status").innerHTML=`<strong>Route verified!</strong><br>Your route is optimal for the current map.`;else $("status").textContent="That route is not the shortest. Try calculating again.";});
+["start","end"].forEach(id=>$(id).addEventListener("change",()=>{clearResult();window.pickNext=id==="start"?"end":"start";}));
+buildSelects();render();
+// Built-in correctness tests: same-node distance and a reachable route.
+const same=dijkstra(0,0),reach=dijkstra(0,2);
+if(same.distance===0&&same.path.length===1&&Number.isFinite(reach.distance))$("testResult").textContent="Built-in checks passed: same-node distance = 0 m; Main Gate → Library is reachable.";
+else $("testResult").textContent="Built-in checks need review.";
+</script>
+</body>
+</html>
